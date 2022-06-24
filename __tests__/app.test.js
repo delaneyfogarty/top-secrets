@@ -2,14 +2,100 @@ const pool = require('../lib/utils/pool');
 const setup = require('../data/setup');
 const request = require('supertest');
 const app = require('../lib/app');
+const { sign } = require('jsonwebtoken');
+const UserService = require('../lib/services/UserService');
+const Secret = require('../lib/models/Secret');
+
+const mockUser = {
+  firstName: 'Delaney',
+  lastName: 'User',
+  email: 'randomUser@gmail.com',
+  password: '54321',
+};
+
+const signUpAndLogin = async (userProps = {}) => {
+  const password = userProps.password ?? mockUser.password;
+
+  const agent = request.agent(app);
+
+  const user = await UserService.create({ ...mockUser, ...userProps });
+
+  const { email } = user;
+  await agent.post('/api/v1/users/sessions').send({ email, password });
+  return [agent, user];
+};
 
 describe('backend-express-template routes', () => {
   beforeEach(() => {
     return setup(pool);
   });
-  it('example test - delete me!', () => {
-    expect(1).toEqual(1);
+
+  it('new user created upon sign up', async () => {
+    const res = await request(app).post('/api/v1/users').send(mockUser);
+    const { firstName, lastName, email } = mockUser;
+
+    expect(res.body).toEqual({
+      id: expect.any(String),
+      firstName,
+      lastName,
+      email,
+    });
   });
+
+  it('signs in already created user', async () => {
+    const [agent, user] = await signUpAndLogin();
+    const me = await agent.get('/api/v1/users/me');
+
+    expect(me.body).toEqual({
+      ...user,
+      exp: expect.any(Number),
+      iat: expect.any(Number),
+    });
+  });
+
+  it('a logged in user should be able to logout', async () => {
+    const [agent, user] = await signUpAndLogin();
+    const me = await agent.get('/api/v1/users/me');
+
+    expect(me.body).toEqual({
+      ...user,
+      exp: expect.any(Number),
+      iat: expect.any(Number),
+    });
+
+    const resp = await request(app).delete('/api/v1/users/sessions');
+    expect(resp.body.message).toEqual('Signed out successfully!');
+    expect(resp.status).toEqual(200);
+
+    const dashboardRequest = await request.agent(app).get('/api/v1/users/me');
+    expect(dashboardRequest.body.message).toEqual(
+      'You must be signed in to continue'
+    );
+  });
+
+  it('allows a logged in user to view secrets', async () => {
+    const [agent, user] = await signUpAndLogin();
+    const me = await agent.get('/api/v1/users/me');
+
+    expect(me.body).toEqual({
+      ...user,
+      exp: expect.any(Number),
+      iat: expect.any(Number),
+    });
+
+    const resp = await agent.get('/api/v1/secrets');
+    const secrets = await Secret.getAllSecrets();
+    const expected = secrets.map((secret) => {
+      return {
+        id: secret.id,
+        title: secret.title,
+        description: secret.description,
+        created_at: expect.any(String),
+      };
+    });
+    expect(resp.body).toEqual(expected);
+  });
+
   afterAll(() => {
     pool.end();
   });
