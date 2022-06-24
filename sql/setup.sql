@@ -18,4 +18,7 @@ CREATE TABLE secrets (
 	title TEXT NOT NULL,
 	description TEXT NOT NULL,
 	created_at TIMESTAMP
-)
+);
+
+INSERT INTO secrets (title, description, created_at) VALUES
+('Leave America ASAP', 'This is no secret', CURRENT_TIMESTAMP)

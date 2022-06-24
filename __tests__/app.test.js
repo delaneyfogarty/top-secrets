@@ -4,6 +4,7 @@ const request = require('supertest');
 const app = require('../lib/app');
 const { sign } = require('jsonwebtoken');
 const UserService = require('../lib/services/UserService');
+const Secret = require('../lib/models/Secret');
 
 const mockUser = {
   firstName: 'Delaney',
@@ -70,6 +71,29 @@ describe('backend-express-template routes', () => {
     expect(dashboardRequest.body.message).toEqual(
       'You must be signed in to continue'
     );
+  });
+
+  it('allows a logged in user to view secrets', async () => {
+    const [agent, user] = await signUpAndLogin();
+    const me = await agent.get('/api/v1/users/me');
+
+    expect(me.body).toEqual({
+      ...user,
+      exp: expect.any(Number),
+      iat: expect.any(Number),
+    });
+
+    const resp = await agent.get('/api/v1/secrets');
+    const secrets = await Secret.getAllSecrets();
+    const expected = secrets.map((secret) => {
+      return {
+        id: secret.id,
+        title: secret.title,
+        description: secret.description,
+        created_at: expect.any(String),
+      };
+    });
+    expect(resp.body).toEqual(expected);
   });
 
   afterAll(() => {
