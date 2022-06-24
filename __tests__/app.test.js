@@ -8,7 +8,7 @@ const UserService = require('../lib/services/UserService');
 const mockUser = {
   firstName: 'Delaney',
   lastName: 'User',
-  email: 'randomUser@dod.gov',
+  email: 'randomUser@gmail.com',
   password: '54321',
 };
 
@@ -50,6 +50,26 @@ describe('backend-express-template routes', () => {
       exp: expect.any(Number),
       iat: expect.any(Number),
     });
+  });
+
+  it('a logged in user should be able to logout', async () => {
+    const [agent, user] = await signUpAndLogin();
+    const me = await agent.get('/api/v1/users/me');
+
+    expect(me.body).toEqual({
+      ...user,
+      exp: expect.any(Number),
+      iat: expect.any(Number),
+    });
+
+    const resp = await request(app).delete('/api/v1/users/sessions');
+    expect(resp.body.message).toEqual('Signed out successfully!');
+    expect(resp.status).toEqual(200);
+
+    const dashboardRequest = await request.agent(app).get('/api/v1/users/me');
+    expect(dashboardRequest.body.message).toEqual(
+      'You must be signed in to continue'
+    );
   });
 
   afterAll(() => {
