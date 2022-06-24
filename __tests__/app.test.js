@@ -2,6 +2,7 @@ const pool = require('../lib/utils/pool');
 const setup = require('../data/setup');
 const request = require('supertest');
 const app = require('../lib/app');
+const { sign } = require('jsonwebtoken');
 
 const mockUser = {
   firstName: 'Delaney',
@@ -36,6 +37,17 @@ describe('backend-express-template routes', () => {
       firstName,
       lastName,
       email,
+    });
+  });
+
+  it('signs in already created user', async () => {
+    const [agent, user] = await signUpAndLogin();
+    const me = await agent.get('/api/v1/users/me');
+
+    expect(me.body).toEqual({
+      ...user,
+      exp: expect.any(Number),
+      iat: expect.any(Number),
     });
   });
 
